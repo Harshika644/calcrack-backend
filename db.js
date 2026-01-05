@@ -1,55 +1,55 @@
-const path = require("path");
-const crypto = require("crypto");
-const dotenv = require("dotenv");
-const multer = require("multer");
-const GridFsStorage = require("multer-gridfs-storage");
-const Grid = require("gridfs-stream");
 const mongoose = require("mongoose");
+const Grid = require("gridfs-stream");
+const multer = require("multer");
+const { GridFsStorage } = require("multer-gridfs-storage");
 
-dotenv.config();
+const mongoURI = process.env.MONGO_URI;
 
-// MongoDB connection
-mongoose.connect(process.env.DB_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+let gfs;
+let upload;
 
-const dbInstance = mongoose.connection;
+// Connect to MongoDB
+mongoose
+  .connect(mongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log("MongoDB connected");
 
-// GridFS init
-const gfs = { grid: null };
+    const conn = mongoose.connection;
 
-dbInstance.once("open", () => {
-  gfs.grid = Grid(dbInstance.db, mongoose.mongo);
-  gfs.grid.collection("fileUploads");
-  console.log("✅ GridFS ready");
-});
+    // Init GridFS
+    gfs = Grid(conn.db, mongoose.mongo);
+    gfs.collection("fileUploads");
 
-// Multer GridFS storage
-const storage = new GridFsStorage({
-  db: dbInstance,
-  file: (req, file) =>
-    new Promise((resolve, reject) => {
-      crypto.randomBytes(16, (err, buf) => {
-        if (err) return reject(err);
-
-        const filename =
-          buf.toString("hex") + path.extname(file.originalname);
-
-        resolve({
-          filename,
+    // Init GridFS Storage (AFTER connection)
+    const storage = new GridFsStorage({
+      db: conn.db,
+      file: (req, file) => {
+        return {
+          filename: file.originalname,
           bucketName: "fileUploads",
           metadata: {
             title: req.body.title || file.originalname,
-            subject: req.body.subject || "General",
-            class: req.body.class || "",
-            chapter: req.body.chapter || "",
           },
-        });
-      });
-    }),
-});
+        };
+      },
+    });
 
-const upload = multer({ storage });
+    upload = multer({ storage });
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
 
-module.exports = { upload, gfs };
+module.exports = {
+  get upload() {
+    return upload;
+  },
+  get gfs() {
+    return gfs;
+  },
+};
+
+
