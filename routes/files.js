@@ -1,20 +1,31 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const { upload, gfs } = require("../db");
+const db = require("../db");
 
 const router = express.Router();
 
 /* ======================
-   UPLOAD PDF
+   UPLOAD PDF (SAFE)
    ====================== */
-router.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
+router.post("/upload", (req, res, next) => {
+  let upload;
+
+  try {
+    upload = db.upload;
+  } catch (err) {
+    return res.status(503).json({ error: "Upload service not ready" });
   }
 
-  res.json({
-    id: req.file.id,
-    title: req.file.metadata.title,
+  upload.single("file")(req, res, (err) => {
+    if (err) return res.status(500).json(err);
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    res.json({
+      id: req.file.id,
+      title: req.file.metadata.title,
+    });
   });
 });
 
@@ -22,7 +33,13 @@ router.post("/upload", upload.single("file"), (req, res) => {
    LIST ALL FILES
    ====================== */
 router.get("/", async (req, res) => {
-  if (!gfs) return res.status(500).json({ error: "GridFS not ready" });
+  let gfs;
+
+  try {
+    gfs = db.gfs;
+  } catch (err) {
+    return res.status(503).json({ error: "GridFS not ready" });
+  }
 
   const files = await gfs.files.find().toArray();
   res.json(files);
@@ -32,7 +49,13 @@ router.get("/", async (req, res) => {
    VIEW PDF
    ====================== */
 router.get("/:id", async (req, res) => {
-  if (!gfs) return res.status(500).json({ error: "GridFS not ready" });
+  let gfs;
+
+  try {
+    gfs = db.gfs;
+  } catch (err) {
+    return res.status(503).json({ error: "GridFS not ready" });
+  }
 
   const file = await gfs.files.findOne({
     _id: new mongoose.Types.ObjectId(req.params.id),
@@ -50,7 +73,13 @@ router.get("/:id", async (req, res) => {
    DELETE PDF
    ====================== */
 router.delete("/:id", async (req, res) => {
-  if (!gfs) return res.status(500).json({ error: "GridFS not ready" });
+  let gfs;
+
+  try {
+    gfs = db.gfs;
+  } catch (err) {
+    return res.status(503).json({ error: "GridFS not ready" });
+  }
 
   const fileId = new mongoose.Types.ObjectId(req.params.id);
 
@@ -61,6 +90,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 module.exports = router;
+
 
 
 
