@@ -1,27 +1,21 @@
 const mongoose = require("mongoose");
 
-const { Schema } = mongoose;
-
-const IssueSchema = new Schema({
-  title: {
-    type: String,
-    required: true,
-    max: 100,
+const issueSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    fileID: {
+      type: mongoose.Schema.Types.Mixed, // supports ObjectId OR string
+      required: true,
+    },
   },
-  description: {
-    type: String,
-    required: true,
-    max: 200,
-  },
-  fileID: {
-    type: [Schema.Types.ObjectId],
-    default: [],
-  },
-});
+  { timestamps: true }
+);
 
-// Virtual URL (optional, fine to keep)
-IssueSchema.virtual("url").get(function () {
-  return "/list/issue/" + this._id;
-});
-
-module.exports = mongoose.model("Issue", IssueSchema);
+module.exports = mongoose.model("Issue", issueSchema);
