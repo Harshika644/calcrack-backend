@@ -1,55 +1,39 @@
+require("dotenv").config();
 const mongoose = require("mongoose");
 const Grid = require("gridfs-stream");
 const multer = require("multer");
-const { GridFsStorage } = require("multer-gridfs-storage");
+const GridFsStorage = require("multer-gridfs-storage");
 
 const mongoURI = process.env.MONGO_URI;
 
+if (!mongoURI) {
+  throw new Error("❌ MONGO_URI is missing in .env");
+}
+
+const conn = mongoose.createConnection(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
 let gfs;
-let upload;
 
-// Connect to MongoDB
-mongoose
-  .connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
-    console.log("MongoDB connected");
+conn.once("open", () => {
+  gfs = Grid(conn.db, mongoose.mongo);
+  gfs.collection("fs");
+  console.log("✅ GridFS connected");
+});
 
-    const conn = mongoose.connection;
+const storage = new GridFsStorage({
+  url: mongoURI,
+  file: (req, file) => ({
+    filename: file.originalname,
+    bucketName: "fs",
+  }),
+});
 
-    // Init GridFS
-    gfs = Grid(conn.db, mongoose.mongo);
-    gfs.collection("fileUploads");
+const upload = multer({ storage });
 
-    // Init GridFS Storage (AFTER connection)
-    const storage = new GridFsStorage({
-      db: conn.db,
-      file: (req, file) => {
-        return {
-          filename: file.originalname,
-          bucketName: "fileUploads",
-          metadata: {
-            title: req.body.title || file.originalname,
-          },
-        };
-      },
-    });
+module.exports = { upload, gfs };
 
-    upload = multer({ storage });
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
-
-module.exports = {
-  get upload() {
-    return upload;
-  },
-  get gfs() {
-    return gfs;
-  },
-};
 
 
