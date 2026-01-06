@@ -1,17 +1,19 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const Issue = require("../models/issue");
 
 const router = express.Router();
 
-/**
- * GET /api/issues
- * Fetch issues with attached GridFS files
- */
 router.get("/issues", async (req, res) => {
   try {
     const issues = await Issue.aggregate([
-      // 🔥 Ensure fileID is ObjectId (important!)
+      // ✅ Only include documents that actually have fileID
+      {
+        $match: {
+          fileID: { $exists: true, $ne: null },
+        },
+      },
+
+      // ✅ Safely convert string → ObjectId
       {
         $addFields: {
           fileID: {
@@ -24,17 +26,24 @@ router.get("/issues", async (req, res) => {
         },
       },
 
-      // 🔗 Join with GridFS files collection
+      // ✅ Join with GridFS files collection
       {
         $lookup: {
-          from: "files",          // ✅ correct collection
+          from: "files",
           localField: "fileID",
           foreignField: "_id",
           as: "files",
         },
       },
 
-      // 🧹 Clean response
+      // ✅ Optional: remove issues without matching files
+      {
+        $match: {
+          files: { $ne: [] },
+        },
+      },
+
+      // ✅ Clean response
       {
         $project: {
           title: 1,
@@ -53,11 +62,12 @@ router.get("/issues", async (req, res) => {
     ]);
 
     res.status(200).json(issues);
-  } catch (error) {
-    console.error("Error fetching issues:", error);
+  } catch (err) {
+    console.error("Aggregation error:", err);
     res.status(500).json({ error: "Failed to fetch issues" });
   }
 });
 
 module.exports = router;
+
 
